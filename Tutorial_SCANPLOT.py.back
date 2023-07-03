@@ -1,0 +1,471 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # SCANPLOT - Um sistema de plotagem simples para o SCANTEC
+# 
+# SCANPLOT_V1.1.0a
+# 
+# <span style="float:right"><img src="img/logo_scantec.png" width=180 height=180 /></span>O SCANPLOT é um módulo escrito em linguagem Python preparado para ler e plotar as tabelas com as estatísticas do Sistema Comunitário de Avaliação de modelos Numéricos de Tempo e Clima (SCANTEC*). O seu uso pode ser feito por meio da linha de comando ou através do Jupyter Notebook. O SCANPLOT transforma as tabelas do SCANTEC em dataframes do Pandas e pode ser facilmente extendido a partir da introdução de funções para a plotagem destes dataframes na forma como o usuário precisar.
+# 
+# O módulo `scanplot` possui as seguintes funções:
+# 
+# 1. `read_namelists`: esta função lê os arquivos de namelist e definições dos modelos do SCANTEC;
+# 2. `get_dataframe`: esta função transforma uma ou mais tabelas em dataframes do Pandas, acessíveis por meio de um dicionário;
+# 3. `plot_lines`: esta função plota gráficos de linhas a partir dos dataframes;
+# 4. `plot_lines_tStudent`: esta função plota gráficos de linhas a partir dos dataframes, acompanhados do teste de significância t de Student;
+# 5. `plot_scorecard`: esta função plota um scorecard a partir dos dataframes;
+# 6. `plot_dTaylor`: esta função plota um diagrama de Taylor a partir dos dataframes.
+# 
+# As funções possuem formas específicas de utilização. Para saber como utilizá-las, carregue primeiro o módulo `scanplot`:
+# 
+# ```Python
+# import scanplot
+# ```
+# 
+# ou 
+# 
+# ```Python
+# import scanplot as sc
+# ```
+# 
+# E em seguida, acesse a documentação da função digitando uma das duas formas a seguir:
+# 
+# ```Python
+# help(read_namelists)
+# ```
+# 
+# ou
+# 
+# ```Python
+# print(red_namelists.__doc__)
+# ```
+# 
+# ---
+# *[de MATTOS, J. G. Z.](http://lattes.cnpq.br/4563659436339486); [SAPUCCI, L. F.](http://lattes.cnpq.br/8285827971934692). **SCANTEC - SISTEMA COMUNITÁRIO DE AVALIAÇÃO DE MODELOS NUMÉRICOS DE TEMPO E CLIMA. 2017.** Patente: Programa de Computador. Número do registro: BR512017000576-1, data de registro: 30/01/2017, Instituição de registro: INPI - Instituto Nacional da Propriedade Industrial. 
+# 
+# ## Leitura dos namelists do SCANTEC
+# 
+# O SCANTEC é um software de linha de comando escrito em linguagem Fortran preparado para ler, interpolar e calcular as estatísticas básicas (Viés, Raiz do Erro Quadrático Médio e Correlação de Anomalias) a partir dos resultados de modelos de previsão numérica de tempo, como os modelos BAM, BRAMS e Eta. O SCANPLOT faz o trabalho de criar as estruturas de dados adequadas e plotar os resultados. As estruturas de dados criadas pelo SCANPLOT, são determinadas a partir das tabelas com o resumo das estatísticas calculadas pelo SCANTEC. Para utilizar o SCANPLOT, o usuário deve ler os arquivos de namelist e definições dos modelos utilizados nas avaliações, de forma que o software saiba quais foram as definições utilizadas pelo usuário e em que local estão armazenadas as tabelas com os resultados.
+# 
+# Para isso, basta utilizar a função `read_namelists` a partir do módulo principal `scanplot`. Esta e as demais funções, podem ser acessadas a partir do módulo principal, o qual deverá ser carregado:
+
+# In[1]:
+
+
+import scanplot
+
+
+# Para conhecer como deve ser utilizada a função `read_namelists`, o usuário pode utilizar um dos comandos a seguir:
+
+# In[2]:
+
+
+help(scanplot.read_namelists)
+
+
+# A função `read_namelists` recebe um caminho (raiz da instalação do SCANTEC) como parâmetro de entrada e retorna para o usuário dois dicionários, os quais contém as informações dos arquivos `scantec.conf` e `scantec.vars` do SCANTEC. Estes arquivos possuem as definições dos modelos (intervalo de tempo da avalação, nome do modelo, resolução, caminhos etc). Os nomes `data_vars` e `data_conf` são os nomes dos objetos que serão criados e que conterão os dicionários com as definições dos arquivos `scantec.vars` e `scantec.conf`, respectivamente. A escolha destes nomes fica a critério do usuário.
+
+# In[3]:
+
+
+data_vars, data_conf = scanplot.read_namelists('/scripts/ensemble/SCANTEC.TESTS')
+
+
+# Para inspecionar o conteúdo e a estrutura dos dados contidos nos objetos `data_conf` e `data_vars`, basta digitar os nomes no prompt:
+
+# In[4]:
+
+
+data_conf
+
+
+# In[5]:
+
+
+data_vars
+
+
+# Com as informações dos arquivos de namelist do SCANTEC carregados, o próximo passo é ler as tabelas geradas na avaliação com o SCANTEC e transformá-las em dataframes do Pandas. Para isso, o usuário deverá utilizar a função `get_dataframe` do módulo `scanplot`.
+# 
+# Da mesma forma como foi feito com a função `read_namelists`, pode-se digitar o comando `print(funcao.__doc__)` ou simplesmente, `help(funcao)` para descobrir como a função deve ser utilizada:
+
+# In[6]:
+
+
+help(scanplot.get_dataframe)
+
+
+# A função `get_dataframe` recebe uma série de parâmetros de entrada e retorna um dicionário com uma ou mais tabelas que já estarão na estrutura de dataframe do Pandas. Na célula a seguir, serão definidos os valores de entrada da função `get_dataframe` a partir dos dicionários `data_conf` e `data_vars`, criados anteriormente.
+# 
+# Observe que os parâmetros `Vars` e `Stats` são atribuídos de formas diferentes dos demais. O parâmetro `Stats` é uma lista que deve possuir pelo menos um elemento e ele sempre deve possuir a forma `Stat = [...]`. Na versão atual do SCANPLOT, o usuário pode escolher as estatísticas `ACOR` (correlação de anomalias), `RMSE` (raiz do erro quadrático médio) e `VIES` (viés), em qualquer ordem ou combinação entre elas. 
+# 
+# O parâmetro `Vars` também é uma lista, mas é definido de forma diferente. O usuário deve observar que no dicionário `data_vars`, para cada índice está associada uma tupla do tipo `('VAR:LEV', 'Nome da Variável @ Nível hPa [unidade]')`.  Isto foi feito para facilitar ao usuário a escolha da variável, pois ao invés de se digitar o nome da variável, basta escolher pelo menos um dos índices do dicionário `data_vars` que deseja, da seguinte forma `Vars = list(map(data_vars.get,[1,2,3,...]`. 
+
+# In[7]:
+
+
+dataInicial = data_conf['Starting Time']
+dataFinal = data_conf['Ending Time']
+Vars = list(map(data_vars.get,[11,12,13])) # ou [*map(data_vars.get,[12,14])]
+Stats = ['ACOR', 'RMSE', 'VIES']
+Exps = list(data_conf['Experiments'].keys()) # ou [*data_conf["Experiments"].keys()]
+outDir = data_conf['Output directory']
+figDir = outDir + '/figs'
+
+
+# Com a definição dos parâmetros de entrada da função `get_dataframe`, a sua utilização é feita da seguinte forma:
+
+# In[8]:
+
+
+dTable = scanplot.get_dataframe(dataInicial,dataFinal,Stats,Exps,outDir,series=False)
+
+
+# Na chamada da função `get_dataframe`, o objeto `dTable` é um dicionário que deverá conter as tabelas escolhidas pelo usuário a partir do ajuste dos parâmetros de entrada da função. Para inspecionar o conteúdo do dicionário `dTable`, basta digitar no prompt:
+
+# In[9]:
+
+
+dTable
+
+
+# No dicionário `dTable`, observe que foram carregadas as tabelas referente às estatísticas escolhidas (`VIES`, `RMS` e `ACOR`). Para visualizar o dataframe da tabela, basta passar o nome da tabela como argumento do dicionário dTable, como em `dTable['NOME_TABELA']`. Veja o exemplo a seguir:
+
+# In[10]:
+
+
+dTable['ACORX126_20200601002020081500T.scan']
+
+
+# ## Explorando os dataframes
+# 
+# Dataframes do Pandas são estruturas de dados tabulados que possuem uma série de funções e métodos que podem também ser aplicados com as tabelas do SCANTEC. Veja nos exemplos abaixo, diferentes formas de selecionar as colunas e plotar os dados de forma individual ou agrupada.
+# 
+# No exemplo a seguir, é feita a seleção da coluna referente à correleção de anomalias da temperatura absoluta em 850 hPa. Para isso, utiliza-se o método `loc` para fazer a localização da variável no dataframe. O método `loc` em um dataframe indexa os valores da tabela a partir dos índices da linha e da coluna, respectivamente (`loc[linha,coluna]`):
+
+# In[11]:
+
+
+dTable['ACORX126_20200601002020081500T.scan'].loc[:,'temp:850']
+
+
+# O dataframe do Pandas permite também realizar a plotagem rápida da seleção realizada utilizando a função `plot()`. Veja no exemplo a seguir:
+
+# In[12]:
+
+
+dTable['ACORX126_20200601002020081500T.scan'].loc[:,['temp:850']].plot();
+
+
+# Com o método `loc`, é possível também escolher mais do que uma coluna. Veja o exemplo a seguir e compare-o com o exemplo anterior:
+
+# In[13]:
+
+
+dTable['ACORX126_20200601002020081500T.scan'].loc[:,['temp:850', 'temp:500', 'temp:250']].plot();
+
+
+# O método `loc` realiza a indexação a partir dos rótulos das colunas. Utilize o método `iloc` para realizar a subseleção a partir dos índices das linhas e colunas:
+
+# In[14]:
+
+
+axes = dTable['ACORX126_20200601002020081500T.scan'].iloc[:,2:5].plot()
+
+
+# Quando múltiplas colunas são selecionadas, pode-se optar pela plotagem em grupo. Para isso, basta passar o argumento `subplots=True` para dentro da função `plot()`:
+
+# In[15]:
+
+
+dTable['ACORX126_20200601002020081500T.scan'].loc[:,['temp:850', 'temp:500', 'temp:250']].plot(subplots=True);
+
+
+# Veja a seguir o mesmo exemplo anterior, mas utilizando o método `iloc`:
+
+# In[16]:
+
+
+axes = dTable['ACORX126_20200601002020081500T.scan'].iloc[:,2:5].plot(subplots=True)
+
+
+# Outras opções de plotagem com o Matplotlib podem ser passadas também para a função `plot()`, veja a seguir:
+
+# In[17]:
+
+
+axes = dTable['ACORX126_20200601002020081500T.scan'].iloc[:,1:-1].plot.line(subplots=True, figsize=(15,10), layout=(4,4), sharex=True)
+
+
+# Com mais do que um experimento, é possível também plotá-los no mesmo gráfico. Veja a seguir como plotar duas colunas de dois dataframes diferentes (ie., duas tabelas do SCANTEC), no mesmo gráfico:
+
+# In[18]:
+
+
+df_exp1 = dTable['ACORX126_20200601002020081500T.scan'].loc[:,['temp:850']]
+df_exp2 = dTable['ACORT126_20200601002020081500T.scan'].loc[:,['temp:850']]
+ax = df_exp1.plot(label=['exp1', 'exp2'])
+df_exp2.plot(ax=ax);
+
+
+# ## Funções de plotagem do SCANPLOT
+# 
+# As tabelas do SCANTEC como dataframes do Pandas, permitem o acesso às facilidades associados ao módulo. O SCANPLOT possui também algumas funções de plotagem que permitem a manipulação das tabelas em lotes. Neste seção, são apresentadas as funções básicas de plotagem.
+# 
+# ### plot_lines
+# 
+# A função `plot_lines` realiza a plotagem das tabelas selecionadas a partir da utilização da função `get_dataframe`. Assim como foi feito anteriormente para as outras funções do SCANPLOT, a ajuda da função pode ser acessada com um dos comandos a seguir:
+
+# In[19]:
+
+
+help(scanplot.plot_lines)
+
+
+# Veja que a função `plot_lines` recebe como parâmetros de entrada o dicionário `dTable`, as listas `Vars` e `Stats` e o diretório de saída `outDir` que será utilizado para salvar as figuras produzidas. A função `plot_lines` parâmetros opcionais tais como `showFig` e `saveFig` que permitem apresentar e salvar as figuras em disco, além de `lineStyles`, uma lista com cores e marcadores para cada experimento a ser plotado. Além disso, a opção `figDir`, permite que um diretório diferente seja utilizado para salvar as figuras. Algumas destes parâmetros opcionais também podem ser utilizados com as demais funções de plotagem do SCANPLOT.
+# 
+# Veja a seguir como utilizar a função `plot_lines`:
+
+# In[20]:
+
+
+scanplot.plot_lines(dTable,Vars,Stats,outDir,figDir=figDir,showFig=True,saveFig=True,combine=False)
+
+
+# Na função `plot_lines`, o parâmetro `combine=True` permite que as curvas dos experimentos sejam combinadas de acordo com a lista de variáveis `Vars` e estatísticas `Stats`. Veja o exemplo a seguir:
+
+# In[21]:
+
+
+scanplot.plot_lines(dTable,Vars,Stats,outDir,figDir=figDir,showFig=True,saveFig=True,combine=True)
+
+
+# A função `plot_lines` permite também que uma lista com cores e estilos de linhas seja passada como argumento da função. Veja no exemplo a seguir que uma lista de nome `lineStyles` é criada e passada como argumento. Observe que a ordem dos atributos (ie., cores e estilos de linha) serão aplicados de acordo com a ordem dos experimentos a serem plotados. Esta opção pode ser útil quando deseja-se que um dos experimentos seja destacado, com um estilo de linha e cor distintos.
+
+# In[22]:
+
+
+lineStyles = ['k--', 'r-', 'g-', 'b-']
+scanplot.plot_lines(dTable,Vars,Stats,outDir,figDir=figDir,lineStyles=lineStyles,showFig=True,saveFig=True,combine=True)
+
+
+# ### plot_scorecard
+# 
+# Outra função interessante do SCANPLOT é a `plot_scorecard`. Nesta função podem ser calculadas duas métricas que permitem quantificar a variação relativa entre dois experimentos avaliados pelo SCANTEC. As métricas aplicadas são o "Ganho Percentual*" e a "Mudança Fracional" e ambas podem ser calculadas com base nas tabelas de estatisticas do SCANTEC. Estas métricas podem ser utilizadas quando se quiser ter uma visão imediata sobre as melhorias obtidas entre duas versões de um modelo ou entre dois experimentos de um mesmo modelo.
+# 
+# O Ganho Percentual é definido por:
+# 
+# $$Ganho_{STAT} = \frac{EXP2_{STAT} - EXP1_{STAT}}{EXP_{perfeito} - EXP1_{STAT}} \times 100$$
+# 
+# onde,
+# 
+# * $EXP1$: tabelas do experimento 1;
+# * $EXP2$: tabelas do experimento 2;
+# * $STAT$: pode ser o VIES, RMSE ou ACOR;
+# * $EXP_{perfeito}$: valor considerado quando o experimento é perfeito, ie., 0 quando VIES ou RMSE e 1 quando ACOR.
+# 
+# A Mudança Fracional é definida por:
+# 
+# $$MF_{STAT} = 1 - \frac{EXP2_{STAT}}{EXP1_{STAT}}$$
+# 
+# onde,
+# 
+# * $EXP1$: tabelas do experimento 1;
+# * $EXP2$: tabelas do experimento 2;
+# * $STAT$: pode ser o VIES, RMSE ou ACOR;
+# 
+# ---
+# *[BAÑOS, I. H.](http://lattes.cnpq.br/6820161737155390); et al. **Impacto da Assimilação de Perfis de Refratividade do  Satélite Metop-B nas Previsões de Tempo do CPTEC/INPE Durante os Meses de Janeiro e Agosto de 2014.** Disponível em [link](https://www.scielo.br/scielo.php?script=sci_arttext&pid=S0102-77862018000100065).
+# 
+# Para aprender a utilizar a função `plot_scorecard`, utilizar o comando a seguir:
+
+# In[23]:
+
+
+help(scanplot.plot_scorecard)
+
+
+# Como o scorecard tem a premissa de resumir as estatísticas calculadas indicando para quais variáveis e quando ele é melhor ou pior do que o outro experimento, é interessante considerar todas as variáveis contidas nas tabelas (pode-se escolher qualquer quantidade ou estatísticas). Neste caso, são considerados apenas os dois experimentos, `EXP1` e `EXP2`. Para isso, incrementamos a lista `Vars` com os índices das variáveis que serão utilizadas:
+
+# In[24]:
+
+
+Vars = list(map(data_vars.get,[*data_vars.keys()]))
+
+
+# In[25]:
+
+
+scanplot.plot_scorecard(dTable,Vars,Stats,'ganho',Exps,outDir,figDir=figDir,showFig=True,saveFig=True)
+
+
+# Para avaliar o ganho entre os demais experimentos, basta redefinir a lista `Exps` indicando o par de experimentos que se deseja avaliar. Por exemplo:
+
+# In[26]:
+
+
+Exps = ['T126', 'TENM']
+scanplot.plot_scorecard(dTable,Vars,Stats,'ganho',Exps,outDir,figDir=figDir,showFig=True,saveFig=True)
+
+
+# Como indicado pela documentação, a função `plot_scorecard` está preparada para plotar os scorecards a partir do ganho percentual (indicado pelo parâmetro `ganho` passado para dentro da função) e a partir do mudança fracional (indicado pelo parâmetro `fc` passado para dentro da função). Veja no exemplo a seguir os scorecards da mudança fracional obtidos a partir das tabelas do SCANTEC, indicadas pelo parâmetro `Stats`:
+
+# In[27]:
+
+
+scanplot.plot_scorecard(dTable,Vars,Stats,'fc',Exps,outDir,figDir=figDir,showFig=True,saveFig=True)
+
+
+# ### plot_dTaylor
+# 
+# O diagrama de Taylor, semelhante ao scorecard, também possui a característica de resumir estatísticas básicas em um único diagrama. A função `plot_dTaylor` utiliza o módulo `SkillMetrics` (veja mais detalhes sobre este módulo em [SkillMetrics](https://pypi.org/project/SkillMetrics/)) para plotar o diagrama de Taylor a partir das tabelas do SCANTEC.
+# 
+# **ATENÇÃO:** Esta função é experimental e deve ser utilizada com cuidado.
+# 
+# Para acessar a documentação da função `plot_dTaylor`, utilize o comando a seguir:
+
+# In[28]:
+
+
+help(scanplot.plot_dTaylor)
+
+
+# A função `plot_dTaylor` permite que sejam selecionadas uma ou mais variáveis, as quais serão plotadas em diagramas separados. O mesmo acontece com os experimentos. Para ilustrar o uso da função `plot_dTaylor`, serão escolhidas duas variáveis dos experimentos avalidados pelo SCANTEC.
+
+# In[29]:
+
+
+Vars = list(map(data_vars.get,[12,13]))
+
+
+# Observe o parâmetros `data_conf`, que é o dicionário criado e que contém as configurações do SCANTEC, inclusive os  prefixos (eg., `EXP01`, `EXP02` etc) dos experimentos:
+
+# In[30]:
+
+
+scanplot.plot_dTaylor(dTable,data_conf,Vars,Stats,outDir,figDir=figDir,showFig=True,saveFig=True)
+
+
+# ### plot_lines_tStudent
+# 
+# A partir das tabelas de correlação de anomalia do SCANTEC, é possível calcular a Transformada de Fisher e utilizar os valores da transformada para o cálculo do teste de significância. Este cálculo baseia-se no documento "Significance Testing for Forecast Skills*". A função `plot_lines_tStudent` é utilizada para este propósito. Porém, diferentemente da função `plot_lines`, para usar a função `plot_lines_tStudent`, é necessário executar o SCANTEC para o período desejado e também para os intervalos do período desejado. Dessa forma, se a intenção do usuário é avaliar o modelo para o período entre 2020060100 e 2020083100, será necessário também realizar a avaliação para os intervalos de tempo entre estas duas datas, ie., com frequência cada 6, 12 ou 24 horas. Neste tipo de avaliação, no namelist `scantec.conf` as variáveis `Starting Time` e `Ending Time` são sempre iguais e elas podem ser atualizadas com o auxílio de algum script que se encarregue de calcular as novas datas.
+# 
+# ---
+# *Disponível em https://gmao.gsfc.nasa.gov/research/atmosphericassim/AVHRR/skilldiff_desc.pdf
+# 
+# Para acessar a documentação da função `plot_lines_tStudent`, basta utilizando o comando a seguir:
+
+# In[31]:
+
+
+help(scanplot.plot_lines_tStudent)
+
+
+# Através da documentação da função, o usuário deve observar que é necessário utilizar as seguintes funções:
+# 
+# * `concat_tables_and_loc`
+# * `df_fill_nan`
+# * `calc_tStudent`
+# 
+# Estas funções são auxiliares à função `plot_lines_tStudent` e, nesta versão do SCANPLOT, elas devem ser aplicadas manualmente.
+# 
+# Para obter a documentação das funções, basta utilizar o comando `print(funcao.__doc__)` ou `help(funcao)`.
+# 
+# Embora o nome da função `plot_lines_tStudent` seja semelhante ao nome da função `plot_lines`, o seu uso e requerimentos são diferentes. A função `plot_lines_tStudent` foi preparada para plotar os gráficos de correlação de anomalia para uma lista de experimentos. Os valores de correlação de anomalia são utilizados para o cálculo do teste de significância t-Student, que permite verificar a significância estatísticas dos resultados apresentados pelas curvas, quanto à sua diferença.
+
+# Antes de executar a função `get_dataframe`, a lista `Exps` será redefinida para que todos os experimentos  disponíveis possam ser avaliados:
+
+# In[32]:
+
+
+Exps = list(data_conf['Experiments'].keys())
+
+
+# Para a utilização da função `plot_lines_tStudent`, é necessário carregar as tabelas de correlação de anomalia calculadas pelo SCANTEC para os intervalos dentro do período de avaliação. Para isso, a função `get_dataframe` deve ser utilizada com a opção `series=True`:
+
+# In[33]:
+
+
+dTable_series = scanplot.get_dataframe(dataInicial,dataFinal,Stats,Exps,outDir,series=True)
+
+
+# In[34]:
+
+
+dTable_series
+
+
+# As tabelas de avaliação do período geradas pelo SCANTEC, já foram previamente carregadas através do comando `dTable = get_dataframe(dataInicial,dataFinal,Stats,Exps,outDir,series=False)`.
+# 
+# Com o auxílio da função `concat_tables_and_loc`, serão criadas as listas concatenadas com todos os dataframes dos experimentos contendos os valores de correlação de anomalia nacessários. Na versão atual do SCANPLOT, apenas uma variável deverá ser avaliada. Para isso, a variável `Var` precisará ser definida da seguinte forma:
+
+# In[35]:
+
+
+Var = Vars[0][0].lower()
+
+
+# In[36]:
+
+
+VarName = Vars[0][1]
+
+
+# In[37]:
+
+
+varlev_exps = scanplot.concat_tables_and_loc(dTable,dataInicial,dataFinal,Exps,Var,series=False)
+
+
+# In[38]:
+
+
+varlev_dia_exps = scanplot.concat_tables_and_loc(dTable_series,dataInicial,dataFinal,Exps,Var,series=True)
+
+
+# Dependendo dos experimentos avaliados, faz-se necessário normalizar o tamanho dos dataframes. No exemplo, os experimentos `GFS` e `X666`, possuem tamanhos diferentes quanto ao horizonte de previsões. No experimento `GFS`, são considerados 11 dias de previsões enquanto que no experimento `X666`, são considerados 13 dias. Nos demais experimentos (`T126`, `TENM`, `X126` e `XENM`), são considerados 15 dias de previsões.
+# 
+# Para normalizar o tamanho dos dataframes contidos nas listas `varlev_exps` e `varlev_dia_exps`, utiliza-se a função `df_fill_nan` do SCANPLOT, cujo resultados serão armazenados na lista `lst_varlev_dia_exps_rsp`.
+
+# In[39]:
+
+
+lst_varlev_dia_exps_rsp = scanplot.df_fill_nan(varlev_exps,varlev_dia_exps)
+
+
+# Com as tabelas concatenadas e em lista, o próximo passo é realizar o cálculo das estatísticas do teste de significância t-Student. Para isso, internamente, o SCANPLOT utiliza os módulos `t` e `ttest_ind` do pacote `scipy.stats`. A função `calc_tStudent` do SCANTEC se encarrega dos procedimentos necessários para esta tarefa. Esta função, calcula os resultados do teste de significância a partir da Transformada de Fisher. Os resultados da aplicação da função, são os seguintes:
+# 
+# * `ldrom_exp`: uma lista com o valor médio do teste de significância (calculados a partir da média e da variância da transformada de Fisher) para cada experimento;
+# * `ldrosup_exp`: uma lista com os valores críticos superiores para cada experimento;
+# * `ldroinf_exp`: uma lista com os valores críticos inferiores para cada experimento;
+
+# In[40]:
+
+
+ldrom_exp, ldrosup_exp, ldroinf_exp = scanplot.calc_tStudent(lst_varlev_dia_exps_rsp)
+
+
+# Finalmente, com as estatísticas do teste de significância calculados, pode-se aplicar a função `plot_lines_tStudent` para plotar os gráficos de correlação de anomalia com o teste de significância:
+
+# In[41]:
+
+
+scanplot.plot_lines_tStudent(dataInicial,dataFinal,dTable_series,Exps,Var,VarName,ldrom_exp,ldrosup_exp,ldroinf_exp,varlev_exps,outDir,figDir=figDir,saveFig=True,showFig=True)
+
+
+# Na verificação acima, o teste de significância mostra que, em relação à referência `X126` (curva tracejada em preto), as diferenças entre as curvas (gráfico de cima, correlação de anomalia - `ACOR`) são significativas quando as respectivas curvas de baixo estão fora (positivo ou negativo) das barras que representam os valores críticos. Isso significa que as diferenças entre as correlações de anomalia, quando fora das barras, são significativas com 95% de confiança.
+
+# Assim como a função `plot_lines`, a função `plot_lines_tStudent` também aceita parâmetros para a customização das cores das curvas:
+
+# In[42]:
+
+
+lineStyles = ['b', 'g', 'r', 'k']
+scanplot.plot_lines_tStudent(dataInicial,dataFinal,dTable_series,Exps,Var,VarName,ldrom_exp,ldrosup_exp,ldroinf_exp,varlev_exps,outDir,figDir=figDir,lineStyles=lineStyles,saveFig=True,showFig=True)
+
+
+# In[ ]:
+
+
+
+
